@@ -14,6 +14,7 @@ export class UIModule {
   private status: HTMLElement;
   private playerScoreEl: HTMLElement;
   private aiScoreEl: HTMLElement;
+  private windDisplayEl: HTMLElement;
 
   private onFire: (angle: number, power: number) => void;
 
@@ -30,6 +31,7 @@ export class UIModule {
     this.status = document.getElementById('status') as HTMLElement;
     this.playerScoreEl = document.getElementById('player-score') as HTMLElement;
     this.aiScoreEl = document.getElementById('ai-score') as HTMLElement;
+    this.windDisplayEl = document.getElementById('wind-display') as HTMLElement;
 
     this.angleInput.addEventListener('input', () => {
       this.angleVal.textContent = this.angleInput.value;
@@ -92,6 +94,39 @@ export class UIModule {
   setScore(player: number, ai: number) {
     this.playerScoreEl.textContent = String(player);
     this.aiScoreEl.textContent = String(ai);
+  }
+
+  /**
+   * Display 2D wind.
+   * x: + → right, − → left
+   * y: + → lift (↑), − → downforce (↓)
+   */
+  setWind(wind: { x: number; y: number }) {
+    const parts: string[] = [];
+
+    const ax = Math.abs(wind.x);
+    if (ax < 0.25) {
+      parts.push('–');
+    } else if (wind.x > 0) {
+      parts.push(`${ax.toFixed(1)} →`);
+    } else {
+      parts.push(`← ${ax.toFixed(1)}`);
+    }
+
+    const ay = Math.abs(wind.y);
+    if (ay < 0.25) {
+      parts.push('–');
+    } else if (wind.y > 0) {
+      parts.push(`↑ ${ay.toFixed(1)}`);
+    } else {
+      parts.push(`↓ ${ay.toFixed(1)}`);
+    }
+
+    if (parts[0] === '–' && parts[1] === '–') {
+      this.windDisplayEl.textContent = 'calm';
+    } else {
+      this.windDisplayEl.textContent = parts.join('   ');
+    }
   }
 
   enableMove(enabled: boolean) {

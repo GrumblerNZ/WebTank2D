@@ -2,13 +2,18 @@
  * Game logic module – evolved from the old Java turn manager +
  * XOR hit detection on polygons.
  *
- * Now: turn state machine + simple projectile simulation + mesh hit test.
+ * Now: turn state machine + projectile sim with 2D wind + terrain height.
  */
 
 import * as THREE from 'three';
 import { AIModule, ShotDecision } from './ai';
 
 export type Turn = 'player' | 'ai' | 'animating';
+
+export interface Wind2D {
+  x: number; // horizontal: + = right, - = left
+  y: number; // vertical:   + = lift,  - = extra gravity
+}
 
 export class GameLogicModule {
   private turn: Turn = 'player';
@@ -20,9 +25,9 @@ export class GameLogicModule {
   private onHit: (winner: 'player' | 'ai' | null) => void;
   private lastShooter: 'player' | 'ai' = 'player';
 
-  // simple gravity + wind placeholders
   private gravity = -9.8;
-  private wind = 0;
+  private wind: Wind2D = { x: 0, y: 0 };
+  private getGroundHeight: (x: number) => number = () => 0;
 
   constructor(
     scene: THREE.Scene,
@@ -41,8 +46,12 @@ export class GameLogicModule {
     return this.turn;
   }
 
-  setWind(w: number) {
+  setWind(w: Wind2D) {
     this.wind = w;
+  }
+
+  setGroundHeightFn(fn: (x: number) => number) {
+    this.getGroundHeight = fn;
   }
 
   /** Player fires – starts projectile animation */
@@ -79,7 +88,6 @@ export class GameLogicModule {
     targetMesh: THREE.Object3D,
     shooter: 'player' | 'ai'
   ) {
-    // clean previous
     if (this.projectile) {
       this.scene.remove(this.projectile);
       this.projectile = null;
@@ -93,36 +101,39 @@ export class GameLogicModule {
     this.scene.add(this.projectile);
 
     const angleRad = (angleDeg * Math.PI) / 180;
-    // power 10-100 → speed roughly 8-25
     const speed = 5 + (power / 100) * 20;
-    let vx = Math.cos(angleRad) * speed;
-    let vy = Math.sin(angleRad) * speed;
+    const vx = Math.cos(angleRad) * speed;
+    const vy = Math.sin(angleRad) * speed;
 
+    const startY = from.y + 0.8;
     const startTime = performance.now();
-    const duration = 4000; // max 4s flight
+    const duration = 5000;
 
     const animate = (now: number) => {
       if (!this.projectile) return;
 
-      const t = (now - startTime) / 1000; // seconds
+      const t = (now - startTime) / 1000;
       if (t > duration / 1000) {
         this.endShot(null);
         return;
       }
 
-      // simple physics
-      this.projectile.position.x = from.x + vx * t + 0.5 * this.wind * t * t;
-      this.projectile.position.y = from.y + 0.8 + vy * t + 0.5 * this.gravity * t * t;
+      // 2D wind: horizontal (x) + vertical lift/downforce (y)
+      this.projectile.position.x =
+        from.x + vx * t + 0.5 * this.wind.x * t * t;
+      this.projectile.position.y =
+        startY + vy * t + 0.5 * (this.gravity + this.wind.y) * t * t;
 
-      // hit test (simple distance for now – later raycast / precise mesh)
+      // tank hit (simple distance)
       const dist = this.projectile.position.distanceTo(targetMesh.position);
-      if (dist < 1.2 && this.projectile.position.y < 1.5) {
+      if (dist < 1.3) {
         this.endShot(shooter === 'player' ? 'player' : 'ai');
         return;
       }
 
-      // ground hit
-      if (this.projectile.position.y <= 0.1) {
+      // terrain hit – use analytic hill height
+      const groundY = this.getGroundHeight(this.projectile.position.x);
+      if (this.projectile.position.y <= groundY + 0.15) {
         this.endShot(null);
         return;
       }
@@ -140,15 +151,13 @@ export class GameLogicModule {
     }
 
     if (winner) {
-      // Hit ends the round – main.ts will update score and reset positions
       this.onStatus(winner === 'player' ? 'HIT! Player wins the round.' : 'HIT! AI wins the round.');
-      this.turn = 'animating'; // keep input locked while we reset
+      this.turn = 'animating';
       this.onTurnChange(this.turn);
       this.onHit(winner);
     } else {
       this.onStatus('Missed.');
       setTimeout(() => {
-        // flip to the other player
         this.turn = this.lastShooter === 'player' ? 'ai' : 'player';
         this.onTurnChange(this.turn);
         this.onStatus(this.turn === 'player' ? 'Your turn.' : 'AI thinking...');
@@ -156,7 +165,6 @@ export class GameLogicModule {
     }
   }
 
-  /** Force next turn (used by main after AI thinks) */
   setTurn(t: Turn) {
     this.turn = t;
     this.onTurnChange(t);

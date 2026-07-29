@@ -49,6 +49,18 @@ html, body {
   color: #f87171;
 }
 
+#wind-line {
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: #a5b4fc;
+}
+
+#wind-line #wind-display {
+  font-weight: 600;
+  color: #c7d2fe;
+}
+
 #turn-info {
   font-size: 1.25rem;
   font-weight: 600;
