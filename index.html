@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebTank2D – Evolved Artillery</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="hud">
+      <div id="turn-info">Player Turn</div>
+      <div id="controls">
+        <label>Angle: <span id="angle-val">45</span>°</label>
+        <input type="range" id="angle" min="5" max="85" value="45" />
+        <label>Power: <span id="power-val">50</span></label>
+        <input type="range" id="power" min="10" max="100" value="50" />
+        <button id="fire-btn">FIRE</button>
+        <button id="move-btn" disabled>MOVE (coming)</button>
+      </div>
+      <div id="status">Ready. Aim and fire.</div>
+    </div>
+    <canvas id="game-canvas"></canvas>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
