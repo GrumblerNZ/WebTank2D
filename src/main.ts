@@ -40,11 +40,24 @@ scene.add(sun);
 // ---- modules ----
 const geometry = new GeometryModule(scene);
 geometry.createTerrain();
-const units = geometry.placeUnits();
+let units = geometry.placeUnits();
+
+let playerScore = 0;
+let aiScore = 0;
 
 const ui = new UIModule((angle, power) => {
   game.playerFire(units.player.position, angle, power, units.ai.mesh);
 });
+
+function resetRound() {
+  // remove old tanks
+  geometry.removeUnits(units);
+  // place fresh ones at new random positions
+  units = geometry.placeUnits();
+  // player always starts the new round
+  game.setTurn('player');
+  ui.setStatus('New round – aim and fire.');
+}
 
 const game = new GameLogicModule(
   scene,
@@ -58,12 +71,20 @@ const game = new GameLogicModule(
     }
   },
   (msg) => ui.setStatus(msg),
-  (_winner) => {
-    // round over – for now just continue; later add score / reset
+  (winner) => {
+    if (winner === 'player') playerScore++;
+    else if (winner === 'ai') aiScore++;
+    ui.setScore(playerScore, aiScore);
+
+    // short pause so the player sees the HIT message + score, then reset
+    setTimeout(() => {
+      resetRound();
+    }, 1800);
   }
 );
 
 // initial state
+ui.setScore(0, 0);
 ui.setTurn('player');
 ui.setStatus('Aim with sliders or arrows, Space / FIRE to shoot.');
 

@@ -12,6 +12,8 @@ export class UIModule {
   private moveBtn: HTMLButtonElement;
   private turnInfo: HTMLElement;
   private status: HTMLElement;
+  private playerScoreEl: HTMLElement;
+  private aiScoreEl: HTMLElement;
 
   private onFire: (angle: number, power: number) => void;
 
@@ -26,6 +28,8 @@ export class UIModule {
     this.moveBtn = document.getElementById('move-btn') as HTMLButtonElement;
     this.turnInfo = document.getElementById('turn-info') as HTMLElement;
     this.status = document.getElementById('status') as HTMLElement;
+    this.playerScoreEl = document.getElementById('player-score') as HTMLElement;
+    this.aiScoreEl = document.getElementById('ai-score') as HTMLElement;
 
     this.angleInput.addEventListener('input', () => {
       this.angleVal.textContent = this.angleInput.value;
@@ -83,6 +87,11 @@ export class UIModule {
 
   setStatus(msg: string) {
     this.status.textContent = msg;
+  }
+
+  setScore(player: number, ai: number) {
+    this.playerScoreEl.textContent = String(player);
+    this.aiScoreEl.textContent = String(ai);
   }
 
   enableMove(enabled: boolean) {

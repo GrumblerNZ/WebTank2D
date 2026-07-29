@@ -98,4 +98,10 @@ export class GeometryModule {
       ai: { position: aiMesh.position.clone(), mesh: aiMesh },
     };
   }
+
+  /** Remove existing unit meshes from the scene (used on round reset) */
+  removeUnits(units: { player: UnitPlacement; ai: UnitPlacement }) {
+    this.scene.remove(units.player.mesh);
+    this.scene.remove(units.ai.mesh);
+  }
 }

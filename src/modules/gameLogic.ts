@@ -140,13 +140,11 @@ export class GameLogicModule {
     }
 
     if (winner) {
+      // Hit ends the round – main.ts will update score and reset positions
       this.onStatus(winner === 'player' ? 'HIT! Player wins the round.' : 'HIT! AI wins the round.');
+      this.turn = 'animating'; // keep input locked while we reset
+      this.onTurnChange(this.turn);
       this.onHit(winner);
-      setTimeout(() => {
-        this.turn = winner === 'player' ? 'ai' : 'player';
-        this.onTurnChange(this.turn);
-        this.onStatus(this.turn === 'player' ? 'Your turn.' : 'AI thinking...');
-      }, 1500);
     } else {
       this.onStatus('Missed.');
       setTimeout(() => {
