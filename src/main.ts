@@ -1,16 +1,18 @@
 /**
  * WebTank2D – browser evolution of the old Java artillery game.
- * Modules mirror the original structure:
- *   Geometry  → procedural terrain + unit placement
- *   AI        → simple angle/power decision
- *   GameLogic → turns + projectile + hit detection
- *   UI        → input + HUD
+ * Modules:
+ *   Geometry   → terrain + tanks
+ *   SkyObjects → aerial skill items (bounce pad / black hole)
+ *   AI         → angle/power decision
+ *   GameLogic  → turns + physics + hits
+ *   UI         → HUD + input
  */
 
 import * as THREE from 'three';
 import { GeometryModule } from './modules/geometry';
 import { GameLogicModule, Turn, Wind2D } from './modules/gameLogic';
 import { UIModule } from './modules/ui';
+import { SkyObjectsModule } from './modules/skyObjects';
 
 // ---- scene setup ----
 const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -41,50 +43,87 @@ const geometry = new GeometryModule(scene);
 geometry.createTerrain();
 let units = geometry.placeUnits();
 
+const skyObjects = new SkyObjectsModule(scene);
+
 let playerScore = 0;
 let aiScore = 0;
 
-/** Random 2D wind: horizontal push + vertical lift / downforce. */
 function randomWind(): Wind2D {
   const mild = () => {
     const r = (Math.random() + Math.random() + Math.random()) / 3;
     return (r - 0.5) * 2;
   };
   return {
-    x: mild() * 5.5, // left / right
-    y: mild() * 4.0, // lift (+) or extra gravity (−)
+    x: mild() * 5.5,
+    y: mild() * 4.0,
   };
 }
 
-function applyWind(wind: Wind2D) {
-  game.setWind(wind);
-  ui.setWind(wind);
+function randomGravity(): number {
+  return -(6 + Math.random() * 8);
 }
 
-const ui = new UIModule((angle, power) => {
-  game.playerFire(units.player.position, angle, power, units.ai.mesh);
-});
+function applyWeather() {
+  const wind = randomWind();
+  const g = randomGravity();
+  game.setWind(wind);
+  game.setGravity(g);
+  ui.setWind(wind);
+  ui.setGravity(g);
+}
+
+function aimPlayerBarrel(angleDeg: number) {
+  GeometryModule.setBarrelAngle(units.player.mesh, angleDeg);
+}
+
+function describeSkyObject(): string {
+  const obj = skyObjects.active;
+  if (!obj) return '';
+  if (obj.type === 'blackhole') return 'Black hole in the air – it pulls your shell.';
+  const names = ['', '', '', 'triangle', 'square', 'pentagon', 'hexagon', 'heptagon', 'octagon'];
+  return `Bounce ${names[obj.sides] ?? 'pad'} in the air – ricochet off it or avoid it.`;
+}
+
+const ui = new UIModule(
+  (angle, power) => {
+    game.playerFire(units.player.position, angle, power, units.ai.mesh);
+  },
+  (angle) => {
+    aimPlayerBarrel(angle);
+  }
+);
 
 function resetRound() {
   geometry.removeUnits(units);
 
-  // new random hill between the sides
   const hill = geometry.randomHillParams();
   geometry.rebuildTerrain(hill.centerX, hill.height, hill.width);
 
   units = geometry.placeUnits();
-  applyWind(randomWind());
+  aimPlayerBarrel(ui.getAngle());
+
+  // One random aerial skill object per round
+  skyObjects.spawnRandom();
+
   game.setTurn('player');
-  ui.setStatus('New round – aim and fire.');
+  ui.setStatus(`New round. ${describeSkyObject()}`);
 }
 
 const game = new GameLogicModule(
   scene,
   (turn: Turn) => {
     ui.setTurn(turn);
+    if (turn === 'player' || turn === 'ai') {
+      applyWeather();
+    }
     if (turn === 'ai') {
       setTimeout(() => {
-        game.aiFire(units.ai.position, units.player.position, units.player.mesh);
+        game.aiFire(
+          units.ai.position,
+          units.player.position,
+          units.player.mesh,
+          units.ai.mesh
+        );
       }, 900);
     }
   },
@@ -100,14 +139,16 @@ const game = new GameLogicModule(
   }
 );
 
-// wire terrain height into physics
 game.setGroundHeightFn((x) => geometry.getHeightAt(x));
+game.setSkyObjects(skyObjects);
 
 // initial state
 ui.setScore(0, 0);
-applyWind(randomWind());
+aimPlayerBarrel(ui.getAngle());
+skyObjects.spawnRandom();
+applyWeather();
 ui.setTurn('player');
-ui.setStatus('Aim with sliders or arrows, Space / FIRE to shoot.');
+ui.setStatus(`Aim and fire. ${describeSkyObject()}`);
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -117,6 +158,11 @@ window.addEventListener('resize', () => {
 
 function animate() {
   requestAnimationFrame(animate);
+  // Gentle spin on black hole ring for readability
+  const obj = skyObjects.active;
+  if (obj && obj.type === 'blackhole') {
+    obj.mesh.rotation.z += 0.01;
+  }
   renderer.render(scene, camera);
 }
 animate();

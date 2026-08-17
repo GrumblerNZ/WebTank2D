@@ -56,7 +56,8 @@ html, body {
   color: #a5b4fc;
 }
 
-#wind-line #wind-display {
+#wind-line #wind-display,
+#wind-line #gravity-display {
   font-weight: 600;
   color: #c7d2fe;
 }

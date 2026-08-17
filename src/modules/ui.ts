@@ -1,6 +1,7 @@
 /**
  * UI and user input module – evolved from the old Java keyboard/mouse handler.
- * Now also drives the HUD and range inputs.
+ * Now also drives the HUD and range inputs, and notifies when aim angle changes
+ * so the 3D cannon barrel can be redrawn (rotated) live.
  */
 
 export class UIModule {
@@ -15,11 +16,17 @@ export class UIModule {
   private playerScoreEl: HTMLElement;
   private aiScoreEl: HTMLElement;
   private windDisplayEl: HTMLElement;
+  private gravityDisplayEl: HTMLElement;
 
   private onFire: (angle: number, power: number) => void;
+  private onAngleChange: (angle: number) => void;
 
-  constructor(onFire: (angle: number, power: number) => void) {
+  constructor(
+    onFire: (angle: number, power: number) => void,
+    onAngleChange: (angle: number) => void = () => {}
+  ) {
     this.onFire = onFire;
+    this.onAngleChange = onAngleChange;
 
     this.angleInput = document.getElementById('angle') as HTMLInputElement;
     this.powerInput = document.getElementById('power') as HTMLInputElement;
@@ -32,10 +39,15 @@ export class UIModule {
     this.playerScoreEl = document.getElementById('player-score') as HTMLElement;
     this.aiScoreEl = document.getElementById('ai-score') as HTMLElement;
     this.windDisplayEl = document.getElementById('wind-display') as HTMLElement;
+    this.gravityDisplayEl = document.getElementById('gravity-display') as HTMLElement;
 
-    this.angleInput.addEventListener('input', () => {
+    const notifyAngle = () => {
+      const angle = parseInt(this.angleInput.value, 10);
       this.angleVal.textContent = this.angleInput.value;
-    });
+      this.onAngleChange(angle);
+    };
+
+    this.angleInput.addEventListener('input', notifyAngle);
     this.powerInput.addEventListener('input', () => {
       this.powerVal.textContent = this.powerInput.value;
     });
@@ -54,11 +66,11 @@ export class UIModule {
       }
       if (e.code === 'ArrowLeft') {
         this.angleInput.value = String(Math.max(5, parseInt(this.angleInput.value) - 2));
-        this.angleVal.textContent = this.angleInput.value;
+        notifyAngle();
       }
       if (e.code === 'ArrowRight') {
         this.angleInput.value = String(Math.min(85, parseInt(this.angleInput.value) + 2));
-        this.angleVal.textContent = this.angleInput.value;
+        notifyAngle();
       }
       if (e.code === 'ArrowUp') {
         this.powerInput.value = String(Math.min(100, parseInt(this.powerInput.value) + 2));
@@ -69,6 +81,10 @@ export class UIModule {
         this.powerVal.textContent = this.powerInput.value;
       }
     });
+  }
+
+  getAngle(): number {
+    return parseInt(this.angleInput.value, 10);
   }
 
   setTurn(turn: string) {
@@ -127,6 +143,11 @@ export class UIModule {
     } else {
       this.windDisplayEl.textContent = parts.join('   ');
     }
+  }
+
+  /** Show gravity as positive magnitude (e.g. 9.8). Higher = pulls down harder. */
+  setGravity(g: number) {
+    this.gravityDisplayEl.textContent = Math.abs(g).toFixed(1);
   }
 
   enableMove(enabled: boolean) {

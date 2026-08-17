@@ -1,6 +1,7 @@
 /**
  * Geometry module – evolved from the old Java random-geometry + placement code.
- * Generates procedural terrain with a random hill between players, and places units.
+ * Generates procedural terrain with a central hill and places units.
+ * (Side elevations rolled back – sky skill objects provide the new challenge.)
  */
 
 import * as THREE from 'three';
@@ -14,7 +15,6 @@ export class GeometryModule {
   private scene: THREE.Scene;
   private terrainMesh: THREE.Mesh | null = null;
 
-  // Analytic hill used for both mesh generation and ground collision
   private hillCenterX = 0;
   private hillHeight = 0;
   private hillWidth = 6;
@@ -23,17 +23,13 @@ export class GeometryModule {
     this.scene = scene;
   }
 
-  /** Ground height at world X (matches the hill shape on the terrain mesh). */
+  /** Ground height at world X (central hill only). */
   getHeightAt(x: number): number {
     if (this.hillHeight <= 0.05) return 0;
     const t = (x - this.hillCenterX) / this.hillWidth;
     return this.hillHeight * Math.exp(-(t * t));
   }
 
-  /**
-   * Build / rebuild terrain with a random-height hill between the two sides.
-   * centerX / height / width control the hill; mild noise keeps it from looking too smooth.
-   */
   rebuildTerrain(centerX: number, height: number, width: number): THREE.Mesh {
     if (this.terrainMesh) {
       this.scene.remove(this.terrainMesh);
@@ -50,10 +46,10 @@ export class GeometryModule {
     const pos = geometry.attributes.position;
 
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i); // plane is in XY before rotation; X stays world-X after rot
-      const noise = (Math.random() - 0.5) * 0.25;
+      const x = pos.getX(i);
+      const noise = (Math.random() - 0.5) * 0.2;
       const h = this.getHeightAt(x) + noise;
-      pos.setZ(i, h); // Z becomes world Y after rotation.x = -PI/2
+      pos.setZ(i, h);
     }
     geometry.computeVertexNormals();
 
@@ -72,12 +68,11 @@ export class GeometryModule {
     return terrain;
   }
 
-  /** First-time terrain (mild central hill so the first round is interesting). */
   createTerrain(): THREE.Mesh {
-    return this.rebuildTerrain(0, 1.5 + Math.random() * 2.5, 5 + Math.random() * 4);
+    const p = this.randomHillParams();
+    return this.rebuildTerrain(p.centerX, p.height, p.width);
   }
 
-  /** Build a simple tank-like unit (body + turret + barrel) */
   private createTankMesh(color: number): THREE.Group {
     const group = new THREE.Group();
 
@@ -97,18 +92,29 @@ export class GeometryModule {
     const barrelGeo = new THREE.CylinderGeometry(0.08, 0.1, 1.1, 6);
     const barrelMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
     const barrel = new THREE.Mesh(barrelGeo, barrelMat);
-    barrel.rotation.z = Math.PI / 2;
-    barrel.position.set(0.55, 0.6, 0);
+    barrel.position.set(0, 0.55, 0);
     barrel.castShadow = true;
-    group.add(barrel);
+
+    const aimPivot = new THREE.Group();
+    aimPivot.position.set(0.35, 0.6, 0);
+    aimPivot.add(barrel);
+    aimPivot.rotation.z = -Math.PI / 2;
+    group.add(aimPivot);
 
     group.userData.barrel = barrel;
+    group.userData.aimPivot = aimPivot;
     group.userData.turret = turret;
 
     return group;
   }
 
-  /** Place player (left) and AI (right); Y follows terrain height. */
+  static setBarrelAngle(tank: THREE.Group, angleDeg: number) {
+    const pivot = tank.userData.aimPivot as THREE.Group | undefined;
+    if (!pivot) return;
+    const angleRad = (angleDeg * Math.PI) / 180;
+    pivot.rotation.z = -Math.PI / 2 + angleRad;
+  }
+
   placeUnits(): { player: UnitPlacement; ai: UnitPlacement } {
     const playerMesh = this.createTankMesh(0x3b82f6);
     const aiMesh = this.createTankMesh(0xef4444);
@@ -132,12 +138,11 @@ export class GeometryModule {
     };
   }
 
-  /** Random hill params for a new round (peak between the two tanks). */
   randomHillParams(): { centerX: number; height: number; width: number } {
     return {
-      centerX: -2 + Math.random() * 4, // roughly between the sides
-      height: 1.2 + Math.random() * 4.5, // 1.2 … 5.7
-      width: 4 + Math.random() * 5, // 4 … 9
+      centerX: -2 + Math.random() * 4,
+      height: 1.2 + Math.random() * 4.5,
+      width: 4 + Math.random() * 5,
     };
   }
 
